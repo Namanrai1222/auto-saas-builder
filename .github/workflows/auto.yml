@@ -26,9 +26,14 @@ jobs:
         run: npm install -g openclaw
 
       - name: Configure OpenClaw Local Profile for Actions
-        # We physically create the local credential file expected by OpenClaw
+        # We physically create the local configuration and credentials expected by OpenClaw
         run: |
           mkdir -p ~/.openclaw/credentials
+          
+          # 1. Inject Config (Default Model selection)
+          echo '{"agents":{"defaults":{"model":{"primary":"github-copilot/gpt-4o"}}}}' > ~/.openclaw/openclaw.json
+          
+          # 2. Inject Credentials
           if [ -n "$OPENCLAW_COPILOT_TOKEN" ]; then
              echo "Injecting Copilot Token for Headless Pipeline..."
              echo "{\"token\": \"$OPENCLAW_COPILOT_TOKEN\", \"expiresAt\": 4102444800000}" > ~/.openclaw/credentials/github-copilot.token.json
