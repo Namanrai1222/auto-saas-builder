@@ -1,9 +1,9 @@
 require('dotenv').config(); // Load local .env during testing
-const { runOrchestrator } = require('../orchestrator/index.js');
+const { executePipeline } = require('../orchestrator/index.js');
 
 console.log(`[CRON] Workflow triggered at ${new Date().toISOString()}`);
 
-runOrchestrator()
+executePipeline()
     .then(() => {
         console.log("[CRON] Run completed successfully.");
         process.exit(0);
