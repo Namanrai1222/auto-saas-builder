@@ -1,6 +1,6 @@
-const { execFile } = require('child_process');
+const { exec } = require('child_process');
 const util = require('util');
-const execFilePromise = util.promisify(execFile);
+const execPromise = util.promisify(exec);
 
 async function runResearchAgent(idea) {
     console.log(`[Research Agent] Deep-diving market requirements and database architectures for: ${idea.title}...`);
@@ -18,10 +18,10 @@ async function runResearchAgent(idea) {
 
     const isWin = process.platform === 'win32';
     const cmd = isWin ? 'openclaw.cmd' : 'openclaw';
-    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ');
+    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ').replace(/"/g, '\\"');
 
     try {
-        const { stdout } = await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', safePrompt, '--json'], { shell: isWin, timeout: 120000 });
+        const { stdout } = await execPromise(`${cmd} agent --session-id local-saas-builder --message "${safePrompt}" --json`, { timeout: 120000 });
         
         // Isolate JSON natively ignoring wrapper text
         const jsonMatch = stdout.match(/\{[\s\S]*\}/);

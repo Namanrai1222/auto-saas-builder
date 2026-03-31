@@ -1,9 +1,9 @@
-const { execFile } = require('child_process');
+const { exec } = require('child_process');
 const util = require('util');
 const path = require('path');
 const fs = require('fs');
 
-const execFilePromise = util.promisify(execFile);
+const execPromise = util.promisify(exec);
 
 async function runDevAgent(idea, research, ui) {
     console.log("[Dev Agent] Sourcing combined Research & UI Contexts to compile Next.js codebase...");
@@ -40,11 +40,11 @@ CRITICAL CONSTRAINT: DO NOT include any hardcoded secrets, API_KEYs, or security
 
     const isWin = process.platform === 'win32';
     const cmd = isWin ? 'openclaw.cmd' : 'openclaw';
-    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ');
+    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ').replace(/"/g, '\\"');
 
     try {
         console.log("[Dev Agent] Heavy-lifting Dev generation initiated...");
-        await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', safePrompt], { shell: isWin, timeout: 300000 });
+        await execPromise(`${cmd} agent --session-id local-saas-builder --message "${safePrompt}"`, { timeout: 300000 });
         console.log("[Dev Agent] Code generation finalized.");
     } catch (error) {
         throw new Error(`[Dev Agent] OpenClaw fatal crash: ${error.message.split('\n')[0]}`);

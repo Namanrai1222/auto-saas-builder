@@ -1,6 +1,6 @@
-const { execFile } = require('child_process');
+const { exec } = require('child_process');
 const util = require('util');
-const execFilePromise = util.promisify(execFile);
+const execPromise = util.promisify(exec);
 
 async function runFixAgent(projectPath, validationErrors) {
     console.log(`[Fix Agent] Deploying self-healing patch to broken codebase at ${projectPath}...`);
@@ -13,11 +13,11 @@ async function runFixAgent(projectPath, validationErrors) {
     
     const isWin = process.platform === 'win32';
     const cmd = isWin ? 'openclaw.cmd' : 'openclaw';
-    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ');
+    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ').replace(/"/g, '\\"');
     
     try {
         console.log("[Fix Agent] Sourcing OpenClaw to intelligently patch files...");
-        await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', safePrompt], { shell: isWin, timeout: 300000 });
+        await execPromise(`${cmd} agent --session-id local-saas-builder --message "${safePrompt}"`, { timeout: 300000 });
         console.log("[Fix Agent] Patch cycle complete. Returning over to Validator.");
         return true;
     } catch (error) {

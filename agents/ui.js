@@ -1,6 +1,6 @@
-const { execFile } = require('child_process');
+const { exec } = require('child_process');
 const util = require('util');
-const execFilePromise = util.promisify(execFile);
+const execPromise = util.promisify(exec);
 
 async function runUiAgent(idea, research) {
     console.log(`[UI/UX Agent] Architecting component hierarchy and Tailwind design system...`);
@@ -21,10 +21,10 @@ async function runUiAgent(idea, research) {
 
     const isWin = process.platform === 'win32';
     const cmd = isWin ? 'openclaw.cmd' : 'openclaw';
-    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ');
+    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ').replace(/"/g, '\\"');
 
     try {
-        const { stdout } = await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', safePrompt, '--json'], { shell: isWin, timeout: 120000 });
+        const { stdout } = await execPromise(`${cmd} agent --session-id local-saas-builder --message "${safePrompt}" --json`, { timeout: 120000 });
         
         const jsonMatch = stdout.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("LLM failed to return structured Design System JSON.");
