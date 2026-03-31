@@ -30,8 +30,8 @@ jobs:
         run: |
           mkdir -p ~/.openclaw/credentials
           
-          # 1. Inject Config (Default Model selection)
-          echo '{"agents":{"defaults":{"model":{"primary":"github-copilot/gpt-4o"}}}}' > ~/.openclaw/openclaw.json
+          # 1. Inject Config (Default Model selection + Auth Profile)
+          echo '{"auth":{"profiles":{"github-copilot:github":{"provider":"github-copilot","mode":"token"}}},"agents":{"defaults":{"model":{"primary":"github-copilot/gpt-4o"}}}}' > ~/.openclaw/openclaw.json
           
           # 2. Inject Credentials
           if [ -n "$OPENCLAW_COPILOT_TOKEN" ]; then
