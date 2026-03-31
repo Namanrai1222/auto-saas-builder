@@ -21,9 +21,10 @@ async function runUiAgent(idea, research) {
 
     const isWin = process.platform === 'win32';
     const cmd = isWin ? 'openclaw.cmd' : 'openclaw';
+    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ');
 
     try {
-        const { stdout } = await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', prompt, '--json'], { shell: isWin, timeout: 120000 });
+        const { stdout } = await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', safePrompt, '--json'], { shell: isWin, timeout: 120000 });
         
         const jsonMatch = stdout.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("LLM failed to return structured Design System JSON.");

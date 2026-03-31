@@ -13,10 +13,11 @@ async function runFixAgent(projectPath, validationErrors) {
     
     const isWin = process.platform === 'win32';
     const cmd = isWin ? 'openclaw.cmd' : 'openclaw';
+    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ');
     
     try {
         console.log("[Fix Agent] Sourcing OpenClaw to intelligently patch files...");
-        await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', prompt], { shell: isWin, timeout: 300000 });
+        await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', safePrompt], { shell: isWin, timeout: 300000 });
         console.log("[Fix Agent] Patch cycle complete. Returning over to Validator.");
         return true;
     } catch (error) {

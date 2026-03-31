@@ -18,9 +18,10 @@ async function runResearchAgent(idea) {
 
     const isWin = process.platform === 'win32';
     const cmd = isWin ? 'openclaw.cmd' : 'openclaw';
+    const safePrompt = prompt.replace(/\r?\n|\r/g, ' ');
 
     try {
-        const { stdout } = await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', prompt, '--json'], { shell: isWin, timeout: 120000 });
+        const { stdout } = await execFilePromise(cmd, ['agent', '--session-id', 'local-saas-builder', '--message', safePrompt, '--json'], { shell: isWin, timeout: 120000 });
         
         // Isolate JSON natively ignoring wrapper text
         const jsonMatch = stdout.match(/\{[\s\S]*\}/);

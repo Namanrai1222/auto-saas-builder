@@ -142,16 +142,18 @@ async function executePipeline() {
         runLog.error = error.message;
         console.error(`\n[!] PRODUCTION SYSTEM HALT: ${error.message}`);
         
-        // Notify of partial or hard failure safely
         await runNotifyAgent({
             success: false,
             message: `System Failure Caught by Safety Constraints.\nReason: ${error.message.split('\n')[0]}`
         });
-        process.exit(1); 
-    } finally {
-        // Output deep telemetry to JSON regardless of execution fate
+        
+        // Output deep telemetry to JSON unconditionally before the kernel halts the node process
         fs.writeFileSync(path.join(logsDir, `run-${Date.now()}.json`), JSON.stringify(runLog, null, 2));
+        process.exit(1); 
     }
+    
+    // Success State Log Export
+    fs.writeFileSync(path.join(logsDir, `run-${Date.now()}.json`), JSON.stringify(runLog, null, 2));
 }
 
 module.exports = { executePipeline };
