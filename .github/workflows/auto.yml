@@ -1,0 +1,43 @@
+name: Autonomous SaaS Builder
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"   # every 2 hours (safe free usage)
+  workflow_dispatch:
+
+jobs:
+  run-system:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Global OpenClaw
+        run: npm install -g openclaw
+
+      - name: Configure OpenClaw Local Profile for Actions
+        # We physically create the local credential file expected by OpenClaw
+        run: |
+          mkdir -p ~/.openclaw/credentials
+          if [ -n "$OPENCLAW_COPILOT_TOKEN" ]; then
+             echo "Injecting Copilot Token for Headless Pipeline..."
+             echo "{\"token\": \"$OPENCLAW_COPILOT_TOKEN\", \"expiresAt\": 4102444800000}" > ~/.openclaw/credentials/github-copilot.token.json
+          fi
+        env:
+          OPENCLAW_COPILOT_TOKEN: ${{ secrets.OPENCLAW_COPILOT_TOKEN }}
+
+      - name: Install Project Dependencies
+        run: cd auto-saas-builder && npm install
+
+      - name: Run Orchestrator Pipeline
+        run: cd auto-saas-builder && node scheduler/cron.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WHATSAPP_TO_NUMBER: ${{ secrets.WHATSAPP_TO_NUMBER }}
+          OPENCLAW_COPILOT_TOKEN: ${{ secrets.OPENCLAW_COPILOT_TOKEN }}
