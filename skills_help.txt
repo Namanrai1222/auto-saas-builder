@@ -1,0 +1,20 @@
+
+≡ƒª₧ OpenClaw 2026.3.28 (f9b1079) ΓÇö I'm like tmux: confusing at first, then suddenly you can't live without me.
+
+Usage: openclaw skills [options] [command]
+
+List and inspect available skills
+
+Options:
+  -h, --help  Display help for command
+
+Commands:
+  check       Check which skills are ready vs missing requirements
+  info        Show detailed information about a skill
+  install     Install a skill from ClawHub into the active workspace
+  list        List all available skills
+  search      Search ClawHub skills
+  update      Update ClawHub-installed skills in the active workspace
+
+Docs: https://docs.openclaw.ai/cli/skills
+
