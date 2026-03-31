@@ -2,6 +2,8 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { runIdeaAgent } = require('../agents/idea');
+const { runResearchAgent } = require('../agents/research');
+const { runUiAgent } = require('../agents/ui');
 const { runDevAgent } = require('../agents/dev');
 const { runSecurityAgent } = require('../agents/security');
 const { runValidatorAgent } = require('../agents/validator');
@@ -65,19 +67,24 @@ async function executePipeline() {
         const idea = await runIdeaAgent();
         runLog.idea = idea.title;
 
-        // Semantic Idea Filtering / Reject low-effort hallucinations instantly
         if (idea.title.toLowerCase().includes("todo") || Object.keys(idea).length < 2) {
             throw new Error("Idea Quality Filter Rejected: Detected generic or low-value target generation.");
         }
         console.log(`Targeting: ${idea.title}`);
 
-        console.log("\n--- [2] DEV GENERATION PHASE ---");
-        const projectPath = await runDevAgent(idea);
+        console.log("\n--- [2] RESEARCH (PRODUCT MANAGER) PHASE ---");
+        const research = await runResearchAgent(idea);
 
-        console.log("\n--- [3] PRE-BUILD SECURITY GATE ---");
+        console.log("\n--- [3] UI/UX (DESIGN SYSTEMS) PHASE ---");
+        const ui = await runUiAgent(idea, research);
+
+        console.log("\n--- [4] DEV GENERATION PHASE ---");
+        const projectPath = await runDevAgent(idea, research, ui);
+
+        console.log("\n--- [5] PRE-BUILD SECURITY GATE ---");
         await runSecurityAgent(projectPath);
 
-        console.log("\n--- [4] ITERATIVE BUILD & SELF-HEALING PHASE ---");
+        console.log("\n--- [6] ITERATIVE BUILD & SELF-HEALING PHASE ---");
         let isBuildValid = false;
         let attempts = 0;
 
@@ -101,30 +108,27 @@ async function executePipeline() {
             throw new Error(`Orchestrator FATAL: Failed to produce a compiling build safely after ${MAX_FIX_RETRIES} attempts.`);
         }
 
-        console.log("\n--- [5] QUALITY & CONFIDENCE GATES ---");
-        // Ensure the Fix agent didn't patch in malicious eval exploits
+        console.log("\n--- [7] QUALITY & CONFIDENCE GATES ---");
         await runSecurityAgent(projectPath);
         
         const qualityResult = await runQualityAgent(projectPath);
         runLog.qualityScore = qualityResult.score;
 
-        // Confidence Scoring Algorithm: Base Quality minus Iterative Penalties
-        const errorPenalty = (attempts - 1) * 12; // Dock 12 confidence points per compilation failure hallucinated
+        const errorPenalty = (attempts - 1) * 12;
         let confidence = qualityResult.score - errorPenalty;
         confidence = Math.max(0, confidence);
         runLog.confidenceScore = confidence;
 
         console.log(`[Orchestrator] Final Confidence Formulation Score: ${confidence}/100.`);
 
-        // Hard Drop Constraint Edge Gate
         if (confidence < 75) {
             throw new Error(`Confidence Threshold Failure (Score: ${confidence} < 75). Rejecting deployment to protect GitHub Repository brand identity.\nQA Issues Flagged: ${qualityResult.issues.join(' | ')}`);
         }
 
-        console.log("\n--- [6] GITHUB DEPLOYMENT PHASE ---");
+        console.log("\n--- [8] GITHUB DEPLOYMENT PHASE ---");
         const repoUrl = await runGithubAgent(projectPath);
 
-        console.log("\n--- [7] NOTIFICATION PHASE ---");
+        console.log("\n--- [9] NOTIFICATION PHASE ---");
         await runNotifyAgent({
             success: true,
             message: `Your Production SaaS is LIVE! 🚀\nApp: ${idea.title}\nConfidence Score: ${confidence}%\nRepo: ${repoUrl}`
