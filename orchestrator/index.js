@@ -1,74 +1,76 @@
-const fs = require('fs');
-const path = require('path');
+require('dotenv').config();
+const { runIdeaAgent } = require('../agents/idea');
+const { runDevAgent } = require('../agents/dev');
+const { runSecurityAgent } = require('../agents/security');
+const { runValidatorAgent } = require('../agents/validator');
+const { runFixAgent } = require('../agents/fix');
+const { runGithubAgent } = require('../agents/github');
+const { runNotifyAgent } = require('../agents/notify');
 
-// Agents placeholders (will be implemented next)
-const { runIdeaAgent } = require('../agents/idea.js');
-const { runDevAgent } = require('../agents/dev.js');
-const { runSecurityAgent } = require('../agents/security.js');
-const { runValidatorAgent } = require('../agents/validator.js');
-const { runGithubAgent } = require('../agents/github.js');
-const { runNotifyAgent } = require('../agents/notify.js');
+const MAX_FIX_RETRIES = 3;
 
-async function runOrchestrator() {
-    console.log("Starting Autonomous SaaS Builder Pipeline...");
+async function executePipeline() {
+    console.log("=== AUTONOMOUS MULTI-AGENT SaaS BUILDER v2 (PRODUCTION) ===");
+    
     try {
-        // 1. Idea Agent
-        console.log("--- [1] IDEA PHASE ---");
+        console.log("\n--- [1] IDEA PHASE ---");
         const idea = await runIdeaAgent();
-        if (!idea) {
-            console.log("No valid idea found or generated. Skipping run.");
-            return;
-        }
-        console.log(`Generated Idea: ${idea.title}`);
+        console.log(`Targeting: ${idea.title}`);
 
-        // 2. Dev Agent
-        console.log("\n--- [2] DEV PHASE ---");
+        console.log("\n--- [2] DEV GENERATION PHASE ---");
+        // Strictly generates code without mock fallbacks
         const projectPath = await runDevAgent(idea);
-        console.log(`Project generated at: ${projectPath}`);
 
-        // 3. Security Agent (CRITICAL)
-        console.log("\n--- [3] SECURITY PHASE ---");
-        const securityCheck = await runSecurityAgent(projectPath);
-        if (!securityCheck.safe) {
-            throw new Error(`Security validation failed! Issues: ${JSON.stringify(securityCheck.issues)}`);
+        console.log("\n--- [3] PRE-BUILD SECURITY GATE ---");
+        await runSecurityAgent(projectPath);
+
+        console.log("\n--- [4] ITERATIVE BUILD & SELF-HEALING PHASE ---");
+        let isBuildValid = false;
+        let attempts = 0;
+
+        while (attempts < MAX_FIX_RETRIES && !isBuildValid) {
+            attempts++;
+            console.log(`\n[Orchestrator] Build Attempt ${attempts}/${MAX_FIX_RETRIES}`);
+            
+            const validationResult = await runValidatorAgent(projectPath);
+            
+            if (validationResult.status === "success") {
+                isBuildValid = true;
+                break;
+            } else {
+                console.log(`[Orchestrator] Build crashed. Handing execution trace over to Fix Agent...`);
+                await runFixAgent(projectPath, validationResult.errors);
+            }
         }
-        console.log(`Security validation passed. No secrets exposed.`);
 
-        // 4. Validator Agent
-        console.log("\n--- [4] VALIDATION PHASE ---");
-        const isValid = await runValidatorAgent(projectPath);
-        if (!isValid) {
-            throw new Error("Project build or validation failed.");
+        if (!isBuildValid) {
+            throw new Error(`Orchestrator FATAL: Failed to produce a compiling build after ${MAX_FIX_RETRIES} attempts.`);
         }
-        console.log(`Project validation passed.`);
 
-        // 5. GitHub Agent
-        console.log("\n--- [5] GITHUB PHASE ---");
+        console.log("\n--- [5] POST-COMPILATION SECURITY GATES ---");
+        // Re-run security to ensure Fix agent didn't inject malicious modules
+        console.log(`[Orchestrator] Running Final Security Audit post-compilation...`);
+        await runSecurityAgent(projectPath);
+
+        console.log("\n--- [6] GITHUB DEPLOYMENT PHASE ---");
         const repoUrl = await runGithubAgent(projectPath);
-        console.log(`Project pushed to GitHub: ${repoUrl}`);
 
-        // 6. Notify Agent
-        console.log("\n--- [6] NOTIFY PHASE ---");
+        console.log("\n--- [7] NOTIFICATION PHASE ---");
         await runNotifyAgent({
             success: true,
-            message: `Successfully generated and pushed SaaS: ${idea.title}\nRepository: ${repoUrl}`
+            message: `Your Prod-Ready SaaS is LIVE! 🚀\nApp: ${idea.title}\nRepo: ${repoUrl}`
         });
 
-        console.log("\nPipeline finished successfully!");
+        console.log("\n=== V2 PIPELINE COMPLETED SUCCESSFULLY ===");
+
     } catch (error) {
-        console.error("\n[!] PIPELINE ERROR:", error.message);
-        try {
-            await runNotifyAgent({
-                success: false,
-                message: `Pipeline failed during execution.\nError: ${error.message}`
-            });
-        } catch (notifyErr) {
-            console.error("Failed to send failure notification:", notifyErr.message);
-        }
-        throw error; // Let the scheduler handle the exit code
+        console.error(`\n[!] PIPELINE FATAL ERROR: ${error.message}`);
+        await runNotifyAgent({
+            success: false,
+            message: `Pipeline halted during autonomous execution.\nError: ${error.message.split('\n')[0]}`
+        });
+        process.exit(1); // Properly exit with error for GitHub Actions runner status
     }
 }
 
-module.exports = {
-    runOrchestrator
-};
+module.exports = { executePipeline };

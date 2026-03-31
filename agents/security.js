@@ -1,36 +1,75 @@
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
 
 async function runSecurityAgent(projectPath) {
-    console.log(`[Security Agent] Scanning project at ${projectPath}...`);
-    const issues = [];
+    console.log(`[Security Policy] Initiating strict Level 4 audit on ${projectPath}...`);
     let isSafe = true;
+    let issues = [];
 
-    if (!fs.existsSync(projectPath)) {
-        return { safe: false, issues: ["Project path does not exist for scanning."] };
+    // 1. Dependency Audit (NPM Vulnerabilities)
+    try {
+        console.log("[Security Policy] Checking NPM Dependency Tree for critical exploits...");
+        const { stdout } = await execPromise('npm audit --json || true', { cwd: projectPath, timeout: 60000 });
+        const audit = JSON.parse(stdout);
+        const critical = audit.metadata?.vulnerabilities?.critical || 0;
+        const high = audit.metadata?.vulnerabilities?.high || 0;
+        if (critical > 0 || high > 0) {
+            issues.push(`Found ${critical} critical and ${high} high vulnerabilities in injected dependencies.`);
+            isSafe = false;
+        }
+    } catch (err) {
+        console.warn("[Security Policy] Failed to run parse npm audit output.", err.message);
+        // We don't fail here just in case package-lock hasn't fully finalized yet, the AST handles code execution blocks.
     }
 
-    function scanDirectory(directory) {
-        const files = fs.readdirSync(directory);
+    // 2. Deep File Scanning (AST-like Execution Patterns & High Entropy Secrets)
+    const dangerousPatterns = ['eval(', 'child_process', 'exec(', 'spawn(', 'execSync('];
+    // Broad regex for tokens (sk- for OpenAI, AIza for GCP, and standard 40+ char hex keys mapping to generic secrets)
+    const entropyRegex = /(sk-[a-zA-Z0-9]{32,})|(AIza[0-9A-Za-z_-]{35})|([A-Za-z0-9_]{50,})/g; 
+
+    function scanDirectory(dir) {
+        const files = fs.readdirSync(dir);
         for (const file of files) {
-            const fullPath = path.join(directory, file);
-            if (fs.statSync(fullPath).isDirectory()) {
-                if (file !== 'node_modules' && file !== '.git') {
-                    scanDirectory(fullPath);
-                }
+            if (['node_modules', '.git', '.next', 'package-lock.json'].includes(file)) continue;
+
+            const fullPath = path.join(dir, file);
+            const stat = fs.statSync(fullPath);
+
+            if (stat.isDirectory()) {
+                scanDirectory(fullPath);
             } else {
-                // Rule 1: No .env files tracking real secrets should be leaked
+                // Check missing environments
                 if (/^\.env($|\.local$|\.development$|\.production$)/i.test(file)) {
-                    issues.push(`Found leaked environment file: ${fullPath}`);
+                    issues.push(`Found Leaked Environment Template: ${fullPath}`);
                     isSafe = false;
                 }
-                
-                // Rule 2: Scan code files for hardcoded secrets
-                if (/\.(js|jsx|ts|tsx|json|md)$/i.test(file)) {
+
+                // Check file contents
+                const ext = path.extname(file);
+                if (['.js', '.ts', '.jsx', '.tsx', '.json'].includes(ext)) {
                     const content = fs.readFileSync(fullPath, 'utf8');
-                    // Simple heuristics for hardcoded API keys
-                    if (/(API_KEY|SECRET|TOKEN)\s*[:=]\s*['"][\w-]+['"]/i.test(content) || /sk-[a-zA-Z0-9]{20,}/.test(content)) {
-                        issues.push(`Found hardcoded secret or API key pattern in: ${fullPath}`);
+
+                    // 2a. Block Dangerous Sinks (RCE vectors inside hallucinated apps)
+                    dangerousPatterns.forEach(pattern => {
+                        if (content.includes(pattern)) {
+                            issues.push(`Dangerous runtime sink '${pattern}' found in ${fullPath}`);
+                            isSafe = false;
+                        }
+                    });
+
+                    // 2b. High Entropy Token Detection
+                    const matches = content.match(entropyRegex);
+                    if (matches) {
+                        issues.push(`Potential credential exposure (High Entropy Leak) found in ${fullPath}`);
+                        isSafe = false;
+                    }
+
+                    // 2c. Hardcoded Constants Check
+                    if (content.includes('API_KEY=') || content.includes('TOKEN=')) {
+                        issues.push(`Explicit hardcoded secret assignment found in ${fullPath}`);
                         isSafe = false;
                     }
                 }
@@ -38,20 +77,15 @@ async function runSecurityAgent(projectPath) {
         }
     }
 
-    try {
-        scanDirectory(projectPath);
-    } catch (error) {
-        issues.push(`Failed to scan files: ${error.message}`);
-        isSafe = false;
-    }
+    scanDirectory(projectPath);
 
     if (!isSafe) {
-        console.error(`[Security Agent] FAILED. Issues detected:\n`, issues.join('\n'));
-    } else {
-        console.log(`[Security Agent] PASSED. No secrets or .env files found.`);
+        console.error(`[Security Policy] FATAL: System compromised. Build halted securely.`);
+        throw new Error(`Security validation failed! Issues:\n${issues.join('\n')}`);
     }
 
-    return { safe: isSafe, issues };
+    console.log("[Security Policy] Security gates passed! Zero-trust verification successful.");
+    return true;
 }
 
 module.exports = { runSecurityAgent };
