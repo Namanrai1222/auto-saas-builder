@@ -13,8 +13,14 @@ async function runDevAgent(idea) {
         fs.mkdirSync(projectPath, { recursive: true });
     }
 
+    // Sanitize inputs to completely prevent command injection (RCE)
+    const sanitize = (str) => (str || '').replace(/[^a-zA-Z0-9., ?!'-]/g, '');
+    const safeTitle = sanitize(idea.title);
+    const safeDesc = sanitize(idea.description);
+    const safeFeatures = (idea.features || []).map(f => sanitize(f)).join(', ');
+
     // Command to instruct openclaw to write the code. We provide a dummy session-id for the CLI.
-    const prompt = `Create a Next.js SaaS project. Topic: ${idea.title}. Description: ${idea.description}. Features: ${idea.features.join(', ')}. Write the project code strictly to the directory: ${projectPath}. CRITICAL CONSTRAINT: DO NOT include any hardcoded secrets, API_KEYs, or tokens in the codebase.`;
+    const prompt = `Create a Next.js SaaS project. Topic: ${safeTitle}. Description: ${safeDesc}. Features: ${safeFeatures}. Write the project code strictly to the directory: ${projectPath}. CRITICAL CONSTRAINT: DO NOT include any hardcoded secrets, API_KEYs, or tokens in the codebase.`;
     const command = `openclaw agent --session-id local-saas-builder --message "${prompt}"`;
 
     try {

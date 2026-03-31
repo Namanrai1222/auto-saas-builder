@@ -11,8 +11,9 @@ async function runNotifyAgent(notificationData) {
         return true;
     }
 
-    // Escape characters to prevent CLI injection
-    const safeMessage = notificationData.message.replace(/"/g, '\\"');
+    // Sanitize characters robustly to prevent arbitrary command injection (RCE)
+    const sanitize = (str) => (str || '').replace(/[^a-zA-Z0-9., ?!':/-]/g, '');
+    const safeMessage = sanitize(notificationData.message);
     const command = `openclaw message send --channel whatsapp --target ${toNumber} --message "${safeMessage}"`;
 
     try {
