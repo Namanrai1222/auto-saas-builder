@@ -26,20 +26,36 @@ jobs:
         run: npm install -g openclaw
 
       - name: Configure OpenClaw Local Profile for Actions
-        # We physically create the local configuration and credentials expected by OpenClaw
+        # We physically create the local configuration and credentials in all likely headless paths
         run: |
+          # Create both common Linux config paths
           mkdir -p ~/.openclaw/credentials
+          mkdir -p ~/.config/openclaw/credentials
           
           # 1. Inject Config (Default Model selection + Auth Profile)
-          echo '{"auth":{"profiles":{"github-copilot:github":{"provider":"github-copilot","mode":"token"}}},"agents":{"defaults":{"model":{"primary":"github-copilot/gpt-4o"}}}}' > ~/.openclaw/openclaw.json
+          CONFIG_JSON='{"auth":{"profiles":{"github-copilot:github":{"provider":"github-copilot","mode":"token"}}},"agents":{"defaults":{"model":{"primary":"github-copilot/gpt-4o"}}}}'
+          echo "$CONFIG_JSON" > ~/.openclaw/openclaw.json
+          echo "$CONFIG_JSON" > ~/.config/openclaw/openclaw.json
           
           # 2. Inject Credentials
           if [ -n "$OPENCLAW_COPILOT_TOKEN" ]; then
              echo "Injecting Copilot Token for Headless Pipeline..."
-             echo "{\"token\": \"$OPENCLAW_COPILOT_TOKEN\", \"expiresAt\": 4102444800000}" > ~/.openclaw/credentials/github-copilot.token.json
+             CRED_JSON="{\"token\": \"$OPENCLAW_COPILOT_TOKEN\", \"expiresAt\": 4102435200000}"
+             echo "$CRED_JSON" > ~/.openclaw/credentials/github-copilot.token.json
+             echo "$CRED_JSON" > ~/.config/openclaw/credentials/github-copilot.token.json
           fi
         env:
           OPENCLAW_COPILOT_TOKEN: ${{ secrets.OPENCLAW_COPILOT_TOKEN }}
+
+      - name: OpenClaw Environment Diagnostic
+        run: |
+          echo "Checking OpenClaw CLI binary..."
+          which openclaw
+          echo "Checking Auth Status..."
+          openclaw status || echo "Status Check Failed"
+        env:
+          OPENCLAW_COPILOT_TOKEN: ${{ secrets.OPENCLAW_COPILOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACTION_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Install Project Dependencies
         run: npm install
