@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
 
       - name: Install Global OpenClaw
         run: npm install -g openclaw
@@ -33,10 +33,10 @@ jobs:
           OPENCLAW_COPILOT_TOKEN: ${{ secrets.OPENCLAW_COPILOT_TOKEN }}
 
       - name: Install Project Dependencies
-        run: cd auto-saas-builder && npm install
+        run: npm install
 
       - name: Run Orchestrator Pipeline
-        run: cd auto-saas-builder && node scheduler/cron.js
+        run: node scheduler/cron.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WHATSAPP_TO_NUMBER: ${{ secrets.WHATSAPP_TO_NUMBER }}
