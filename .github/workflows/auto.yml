@@ -8,6 +8,8 @@ on:
 jobs:
   run-system:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -40,6 +42,6 @@ jobs:
       - name: Run Orchestrator Pipeline
         run: node scheduler/cron.js
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACTION_TOKEN || secrets.GITHUB_TOKEN }}
           WHATSAPP_TO_NUMBER: ${{ secrets.WHATSAPP_TO_NUMBER }}
           OPENCLAW_COPILOT_TOKEN: ${{ secrets.OPENCLAW_COPILOT_TOKEN }}

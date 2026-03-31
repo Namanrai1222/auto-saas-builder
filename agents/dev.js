@@ -7,7 +7,7 @@ const execPromise = util.promisify(exec);
 
 async function runDevAgent(idea, research, ui) {
     console.log("[Dev Agent] Sourcing combined Research & UI Contexts to compile Next.js codebase...");
-    const projectPath = path.join(__dirname, '../../builds', `saas-${Date.now()}`);
+    const projectPath = path.join(__dirname, '../../builds', `saas-${Date.now()}`).replace(/\\/g, '/');
     
     if (!fs.existsSync(projectPath)) {
         fs.mkdirSync(projectPath, { recursive: true });
